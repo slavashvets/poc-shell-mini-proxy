@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Handle is the entry-point wired in main.go.
+// Handle dispatches PUT / POST / GET / DELETE for /{uuid}.
 func (s *Store) Handle(w http.ResponseWriter, r *http.Request) {
 	uuid := strings.TrimPrefix(r.URL.Path, "/")
 	if uuid == "" {
@@ -16,46 +16,65 @@ func (s *Store) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
+	case http.MethodPut:
+		s.createHandler(w, r, uuid) // create session
 	case http.MethodPost:
-		s.createHandler(w, r, uuid)
+		s.execHandler(w, r, uuid) // run command
 	case http.MethodGet:
-		s.streamHandler(w, r, uuid)
+		s.streamHandler(w, r, uuid) // SSE
 	case http.MethodDelete:
-		s.deleteHandler(w, r, uuid)
+		s.deleteHandler(w, r, uuid) // kill session
 	default:
-		w.Header().Set("Allow", "GET, POST, DELETE")
+		w.Header().Set("Allow", "GET, POST, PUT, DELETE")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-/* POST /{uuid} */
-func (s *Store) createHandler(w http.ResponseWriter, r *http.Request, uuid string) {
-	cmd, err := readCommand(r.Body)
-	if err != nil || cmd == "" {
-		http.Error(w, "invalid or empty command", http.StatusBadRequest)
-		return
-	}
-
+/* PUT /{uuid} — create session */
+func (s *Store) createHandler(w http.ResponseWriter, _ *http.Request, uuid string) {
 	s.Lock()
+	defer s.Unlock()
+
 	if _, exists := s.sessions[uuid]; exists {
-		s.Unlock()
 		http.Error(w, "session already exists", http.StatusConflict)
 		return
 	}
-	sess, err := newSession(cmd)
+	sess, err := newSession()
 	if err != nil {
-		s.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	s.sessions[uuid] = sess
-	s.Unlock()
-
 	time.AfterFunc(s.ttl, func() { s.Delete(uuid) })
+	w.WriteHeader(http.StatusCreated)
+}
+
+/* POST /{uuid} — execute command within an existing shell */
+func (s *Store) execHandler(w http.ResponseWriter, r *http.Request, uuid string) {
+	cmdStr, err := readCommand(r.Body)
+	if err != nil || cmdStr == "" {
+		http.Error(w, "empty command", http.StatusBadRequest)
+		return
+	}
+
+	s.RLock()
+	sess, ok := s.sessions[uuid]
+	s.RUnlock()
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	// send command + newline to shell stdin
+	if _, err := fmt.Fprintln(sess.stdin, cmdStr); err != nil {
+		http.Error(w, "write to session failed", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusAccepted)
 }
 
-/* GET /{uuid} */
+/* GET /{uuid} — SSE stream */
 func (s *Store) streamHandler(w http.ResponseWriter, r *http.Request, uuid string) {
 	s.RLock()
 	sess, ok := s.sessions[uuid]
@@ -90,7 +109,7 @@ func (s *Store) streamHandler(w http.ResponseWriter, r *http.Request, uuid strin
 	}
 }
 
-/* DELETE /{uuid} */
+/* DELETE /{uuid} — terminate session */
 func (s *Store) deleteHandler(w http.ResponseWriter, r *http.Request, uuid string) {
 	s.Delete(uuid)
 	w.WriteHeader(http.StatusNoContent)
