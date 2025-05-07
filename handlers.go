@@ -111,6 +111,9 @@ func (s *Store) streamHandler(w http.ResponseWriter, r *http.Request, uuid strin
 
 /* DELETE /{uuid} — terminate session */
 func (s *Store) deleteHandler(w http.ResponseWriter, r *http.Request, uuid string) {
-	s.Delete(uuid)
-	w.WriteHeader(http.StatusNoContent)
+	if s.Delete(uuid) {
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		http.NotFound(w, r)
+	}
 }

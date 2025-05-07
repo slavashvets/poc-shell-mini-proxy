@@ -20,13 +20,16 @@ func NewStore(ttl time.Duration) *Store {
 	}
 }
 
-// Delete stops the shell and removes the session.
-func (s *Store) Delete(uuid string) {
+// Delete stops the session (if any) and returns true if it existed.
+func (s *Store) Delete(uuid string) bool {
 	s.Lock()
-	if sess, ok := s.sessions[uuid]; ok {
+	defer s.Unlock()
+
+	sess, ok := s.sessions[uuid]
+	if ok {
 		_ = sess.stdin.Close()
 		_ = sess.cmd.Process.Kill()
 		delete(s.sessions, uuid)
 	}
-	s.Unlock()
+	return ok
 }
