@@ -1,25 +1,27 @@
-# shell-proxy
+# poc-shell-mini-proxy
 
-A **minimal HTTP ↔ interactive shell** gateway written in idiomatic Go.  
-Spawns one long-lived `/bin/sh` per **UUID** and streams stdout/stderr to the client via **Server-Sent Events (SSE)**.
+> **Proof‑of‑concept (PoC)** HTTP ↔ interactive shell gateway. 100 % experimental, **not intended for production use**.
 
-## Features
+I spun this up to learn some Go basics and to explore a tooling pattern I might eventually proxy into containers that have no direct shell access via API (for example, plain Kubernetes pods or locked‑down cloud runtimes where an exec endpoint is disabled). I am **not a Go developer** – so expect rough edges, corner‑cutting and breaking changes while I experiment.
 
-- **Interactive shells** scoped by UUID
-- **SSE**-based real-time streaming of command output
-- **Simple HTTP API**:
+## What it does
 
-  | Method   | Path      | Description                                 |
-  | -------- | --------- | ------------------------------------------- |
-  | `PUT`    | `/{uuid}` | Create a new shell session                  |
-  | `POST`   | `/{uuid}` | Execute a command inside that shell         |
-  | `GET`    | `/{uuid}` | Stream stdout/stderr via SSE                |
-  | `DELETE` | `/{uuid}` | Terminate the shell and destroy the session |
+- Spawns one long‑lived `/bin/sh` per **UUID**
+- Maps a very small **HTTP API** onto that shell
+- Streams combined `stdout/stderr` back to the caller using **Server‑Sent Events (SSE)**
+
+| Method   | Path      | Purpose                           |
+| -------- | --------- | --------------------------------- |
+| `PUT`    | `/{uuid}` | Create a shell session            |
+| `POST`   | `/{uuid}` | Run a command inside that session |
+| `GET`    | `/{uuid}` | Follow live output via SSE        |
+| `DELETE` | `/{uuid}` | Terminate the session & clean up  |
+
+⚠️ **Security notice:** this literally executes arbitrary shell code. Run only on trusted hosts or inside a very tight sandbox.
 
 ## Prerequisites
 
-- **Go 1.24+** (darwin/arm64 & x86_64)
-- **Homebrew** (macOS) – for easy installs
+- **Go 1.24+**
 
 ```bash
 brew install go            # Go toolchain
@@ -33,9 +35,6 @@ Make sure `$GOPATH/bin` (usually `~/go/bin`) is in your `$PATH`.
 ## Setup & Development
 
 ```bash
-git clone <repo-url> shell-proxy
-cd shell-proxy
-
 # Format + imports
 goimports -w .
 go fmt ./...
@@ -53,42 +52,14 @@ go build -o shell-proxy .
 
 Server listens on **`localhost:8080`** by default.
 
----
-
-## Quick Manual Test (cURL)
-
-```bash
-uuid=$(uuidgen)
-
-# 1. Create session
-curl -X PUT http://localhost:8080/$uuid
-
-# 2. Execute command
-curl -X POST http://localhost:8080/$uuid \
-     -d 'echo hello && echo done && exit'
-
-# 3. Stream output (SSE)
-curl -N http://localhost:8080/$uuid
-# → data:hello
-# → data:done
-
-# 4. Delete session
-curl -X DELETE http://localhost:8080/$uuid
-```
-
 ## Automated Tests (Hurl)
 
 ```bash
 uuid=$(uuidgen)
-unkown=00000000-0000-0000-0000-deadbeefdead 
+unkown=00000000-0000-0000-0000-deadbeefdead
 
 hurl --variable uuid=$uuid tests/happy_flow.hurl
 hurl --variable uuid=$uuid tests/duplicate_session.hurl
 hurl --variable uuid=$uuid tests/deleted_session.hurl
 hurl --variable unknown=$unkown tests/unknown_session.hurl
 ```
-
-## Security Notice
-
-This gateway executes **arbitrary shell code**.
-Use only on trusted hosts or protect with appropriate sandboxing/ACLs.
