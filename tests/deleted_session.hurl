@@ -3,6 +3,7 @@
 # Ensure the session is gone (idempotent)
 DELETE http://localhost:8080/{{uuid}}
 
+HTTP/1.1 204
 
 # GET after delete
 GET http://localhost:8080/{{uuid}}
