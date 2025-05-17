@@ -56,10 +56,10 @@ Server listens on **`localhost:8080`** by default.
 
 ```bash
 uuid=$(uuidgen)
-unkown=00000000-0000-0000-0000-deadbeefdead
+unknown=00000000-0000-0000-0000-deadbeefdead
 
 hurl --variable uuid=$uuid tests/happy_flow.hurl
 hurl --variable uuid=$uuid tests/duplicate_session.hurl
 hurl --variable uuid=$uuid tests/deleted_session.hurl
-hurl --variable unknown=$unkown tests/unknown_session.hurl
+hurl --variable unknown=$unknown tests/unknown_session.hurl
 ```
