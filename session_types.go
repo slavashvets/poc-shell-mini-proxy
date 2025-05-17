@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"sync"
 )
 
 // Session is a long-lived interactive shell.
@@ -45,10 +46,21 @@ func newSession() (*Session, error) {
 
 	go func() {
 		defer close(sess.out)
-		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
-		for scanner.Scan() {
-			sess.out <- scanner.Text()
+
+		var wg sync.WaitGroup
+		scanPipe := func(r io.Reader) {
+			defer wg.Done()
+			scanner := bufio.NewScanner(r)
+			for scanner.Scan() {
+				sess.out <- scanner.Text()
+			}
 		}
+
+		wg.Add(2)
+		go scanPipe(stdout)
+		go scanPipe(stderr)
+		wg.Wait()
+
 		cmd.Wait()
 		close(sess.done)
 	}()
