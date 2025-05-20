@@ -1,5 +1,7 @@
 # poc-shell-mini-proxy
 
+Hello World
+
 > **Proof‑of‑concept (PoC)** HTTP ↔ interactive shell gateway. 100 % experimental, **not intended for production use**.
 
 I spun this up to learn some Go basics and to explore a tooling pattern I might eventually proxy into containers that have no direct shell access via API (for example, plain Kubernetes pods or locked‑down cloud runtimes where an exec endpoint is disabled). I am **not a Go developer** – so expect rough edges, corner‑cutting and breaking changes while I experiment.
