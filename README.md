@@ -62,4 +62,8 @@ hurl --variable uuid=$uuid tests/happy_flow.hurl
 hurl --variable uuid=$uuid tests/duplicate_session.hurl
 hurl --variable uuid=$uuid tests/deleted_session.hurl
 hurl --variable unknown=$unkown tests/unknown_session.hurl
+
+## Hello World
+
+Hello, World!
 ```
